@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undercover</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        button:active { background-color: #c0392b; }
+        input {
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            border: none;
+            margin-bottom: 10px;
+        }
+        h1 { font-size: 30px; }
+        .hidden { display: none; }
+        #mot-secret { font-size: 35px; color: #f1c40f; font-weight: bold; margin: 20px 0; }
+        #message-role { font-size: 22px; }
+        
+        /* Style pour la liste des joueurs */
+        #liste-joueurs-container {
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        .etiquette-joueur {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-supprimer {
+            color: #ff6b6b;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ÉCRAN 1 : Configuration -->
+    <div id="ecran-setup">
+        <h1>Undercover 🕵️‍♂️</h1>
+        <p>Ajoute les joueurs :</p>
+        <input type="text" id="nom-joueur" placeholder="Nom du joueur">
+        <br>
+        <button onclick="ajouterJoueur()" style="padding: 10px 20px; font-size: 16px; margin-top: 5px;">Ajouter</button>
+        
+        <h3 id="compteur-joueurs">Joueurs : 0</h3>
+        <div id="liste-joueurs-container"></div>
+
+        <button onclick="lancerJeu()" style="background-color: #2ecc71; width: 100%; max-width: 300px;">Démarrer la partie</button>
+    </div>
+
+    <!-- ÉCRAN 2 : Passe le téléphone -->
+    <div id="ecran-transition" class="hidden">
+        <h1>Au tour de :</h1>
+        <h2 id="nom-actuel" style="color: #3498db; font-size: 40px;">Nom</h2>
+        <p>Passez le téléphone à cette personne.</p>
+        <button onclick="voirMot()">Voir mon mot secret</button>
+    </div>
+
+    <!-- ÉCRAN 3 : Le mot secret -->
+    <div id="ecran-mot" class="hidden">
+        <h2>Chut ! 🤫</h2>
+        <div id="message-role">Ton mot secret est :</div>
+        <div id="mot-secret">MOT</div>
+        <button onclick="joueurSuivant()">Cacher et passer au suivant</button>
+    </div>
+
+    <!-- ÉCRAN 4 : Fin de distribution -->
+    <div id="ecran-fin" class="hidden">
+        <h1>Tout le monde a son mot !</h1>
+        <p>Que le jeu commence. Le joueur le plus jeune commence à parler.</p>
+        <button onclick="nouvellePartie()">Nouvelle Partie</button>
+    </div>
+
+    <script>
+        // On récupère les joueurs sauvegardés en mémoire, sinon on crée une liste vide
+        let joueurs = JSON.parse(localStorage.getItem('undercover_joueurs')) || [];
+        let indexActuel = 0;
+        let repartition = [];
+
+        // Base de mots (100 paires pour ne jamais s'ennuyer)
+        const mots = [
+            { civil: "Pomme", undercover: "Poire" },
+            { civil: "Cinéma", undercover: "Théâtre" },
+            { civil: "Chien", undercover: "Loup" },
+            { civil: "Voiture", undercover: "Moto" },
+            { civil: "Mer", undercover: "Océan" },
+            { civil: "Chocolat", undercover: "Cacao" },
+            { civil: "Tigre", undercover: "Lion" },
+            { civil: "Guitare", undercover: "Basse" },
+            { civil: "Stylo", undercover: "Crayon" },
+            { civil: "Livre", undercover: "Magazine" },
+            { civil: "Ordinateur", undercover: "Tablette" },
+            { civil: "Chemise", undercover: "T-shirt" },
+            { civil: "Pantalon", undercover: "Short" },
+            { civil: "Chaussette", undercover: "Chaussure" },
+            { civil: "Soleil", undercover: "Lune" },
+            { civil: "Étoile", undercover: "Planète" },
+            { civil: "Rivière", undercover: "Fleuve" },
+            { civil: "Montagne", undercover: "Colline" },
+            { civil: "Forêt", undercover: "Savane" },
+            { civil: "Sable", undercover: "Terre" },
+            { civil: "Neige", undercover: "Glace" },
+            { civil: "Pluie", undercover: "Grêle" },
+            { civil: "Avion", undercover: "Hélicoptère" },
+            { civil: "Bateau", undercover: "Sous-marin" },
+            { civil: "Train", undercover: "Tramway" },
+            { civil: "Vélo", undercover: "Trotinette" },
+            { civil: "Baskets", undercover: "Bottes" },
+            { civil: "Manteau", undercover: "Veste" },
+            { civil: "Écharpe", undercover: "Bonnet" },
+            { civil: "Gant", undercover: "Bonnet" },
+            { civil: "Lunettes", undercover: "Lentilles" },
+            { civil: "Montre", undercover: "Horloge" },
+            { civil: "Bague", undercover: "Bracelet" },
+            { civil: "Or", undercover: "Argent" },
+            { civil: "Diamant", undercover: "Rubis" },
+            { civil: "Chat", undercover: "Panthère" },
+            { civil: "Ours", undercover: "Panda" },
+            { civil: "Poule", undercover: "Canard" },
+            { civil: "Aigle", undercover: "Faucon" },
+            { civil: "Requin", undercover: "Baleine" },
+            { civil: "Dauphin", undercover: "Orque" },
+            { civil: "Serpent", undercover: "Lézard" },
+            { civil: "Grenouille", undercover: "Crapaud" },
+            { civil: "Araignée", undercover: "Fourmi" },
+            { civil: "Abeille", undercover: "Guêpe" },
+            { civil: "Papillon", undercover: "Mouche" },
+            { civil: "Rose", undercover: "Rouge" },
+            { civil: "Arbre", undercover: "Buisson" },
+            { civil: "Herbe", undercover: "Mousse" },
+            { civil: "Fraise", undercover: "Framboise" },
+            { civil: "Banane", undercover: "Ananas" },
+            { civil: "Pêche", undercover: "Abricot" },
+            { civil: "Melon", undercover: "Pastèque" },
+            { civil: "Carotte", undercover: "Pomme de terre" },
+            { civil: "Oignon", undercover: "Ail" },
+            { civil: "Salade", undercover: "Épinard" },
+            { civil: "Fromage", undercover: "Beurre" },
+            { civil: "Lait", undercover: "Yaourt" },
+            { civil: "Pain", undercover: "Brioche" },
+            { civil: "Gâteau", undercover: "Biscuit" },
+            { civil: "Sucre", undercover: "Sel" },
+            { civil: "Poivre", undercover: "Piment" },
+            { civil: "Eau", undercover: "Jus de Fruit" },
+            { civil: "Café", undercover: "Thé" },
+            { civil: "Bière", undercover: "Vin" },
+            { civil: "Couteau", undercover: "Fourchette" },
+            { civil: "Cuillère", undercover: "Louche" },
+            { civil: "Assiette", undercover: "Bol" },
+            { civil: "Verre", undercover: "Tasse" },
+            { civil: "Casserole", undercover: "Poêle" },
+            { civil: "Table", undercover: "Chaise" },
+            { civil: "Canapé", undercover: "Fauteuil" },
+            { civil: "Lit", undercover: "Hamac" },
+            { civil: "Armoire", undercover: "Commode" },
+            { civil: "Tapis", undercover: "Moquette" },
+            { civil: "Rideau", undercover: "Store" },
+            { civil: "Porte", undercover: "Fenêtre" },
+            { civil: "Mur", undercover: "Plafond" },
+            { civil: "Toit", undercover: "Cheminée" },
+            { civil: "Escalier", undercover: "Ascenseur" },
+            { civil: "Piscine", undercover: "Jacuzzi" },
+            { civil: "Bain", undercover: "Douche" },
+            { civil: "Savon", undercover: "Shampoing" },
+            { civil: "Brosse", undercover: "Peigne" },
+            { civil: "Miroir", undercover: "Vitre" },
+            { civil: "Serviette", undercover: "Peignoir" },
+            { civil: "Papier", undercover: "Carton" },
+            { civil: "Ciseaux", undercover: "Cutter" },
+            { civil: "Colle", undercover: "Scotch" },
+            { civil: "Règle", undercover: "Équerre" },
+            { civil: "Sac", undercover: "Valise" },
+            { civil: "Portefeuille", undercover: "Porte-monnaie" },
+            { civil: "Clé", undercover: "Serrure" },
+            { civil: "Téléphone", undercover: "Télévision" },
+            { civil: "Casque", undercover: "Écouteurs" },
+            { civil: "Micro", undercover: "Enceinte" },
+        
+            // Concepts et sentiments
+            { civil: "Amour", undercover: "Amitié" },
+            { civil: "Rêve", undercover: "Cauchemar" },
+            { civil: "Bonheur", undercover: "Joie" },
+            { civil: "Tristesse", undercover: "Colère" },
+            { civil: "Passé", undercover: "Futur" },
+            { civil: "Chance", undercover: "Talent" },
+            { civil: "Courage", undercover: "Force" },
+            { civil: "Peur", undercover: "Angoisse" },
+            { civil: "Intelligence", undercover: "Sagesse" },
+            { civil: "Mensonge", undercover: "Vérité" },
+            { civil: "Secret", undercover: "Mystère" },
+            { civil: "Confiance", undercover: "Trahison" },
+            { civil: "Folie", undercover: "Génie" },
+            { civil: "Liberté", undercover: "Indépendance" },
+            { civil: "Guerre", undercover: "Paix" },
+            { civil: "Richesse", undercover: "Célébrité" },
+            
+            // Lieux et bâtiments
+            { civil: "Hôpital", undercover: "Clinique" },
+            { civil: "École", undercover: "Université" },
+            { civil: "Bibliothèque", undercover: "Planétarium" },
+            { civil: "Restaurant", undercover: "Brasserie" },
+            { civil: "Hôtel", undercover: "AirBnB" },
+            { civil: "Prison", undercover: "Commissariat" },
+            { civil: "Aéroport", undercover: "Gare" },
+            { civil: "Plage", undercover: "Piscine" },
+            { civil: "Désert", undercover: "Plage" },
+            { civil: "Paradis", undercover: "Enfer" },
+            { civil: "Magasin", undercover: "Marché" },
+            { civil: "Campagne", undercover: "Ferme" },
+            
+            // Métiers et statuts
+            { civil: "Médecin", undercover: "Chirurgien" },
+            { civil: "Pompier", undercover: "Policier" },
+            { civil: "Avocat", undercover: "Juge" },
+            { civil: "Chanteur", undercover: "Acteur" },
+            { civil: "Danseur", undercover: "Gymnaste" },
+            { civil: "Étudiant", undercover: "Élève de primaire" },
+            { civil: "Patron", undercover: "Employé" },
+            { civil: "Boulanger", undercover: "Boucher" },
+            { civil: "Boucher", undercover: "Poissonnier" },
+            { civil: "Coiffeur", undercover: "Prothésiste Ongulaire" },
+            { civil: "Espion", undercover: "Détective" },
+            { civil: "Président", undercover: "Ministre" },
+            { civil: "Adolescent", undercover: "Adulte" },
+            { civil: "Enfant", undercover: "Bébé" },
+            
+            // Événements et Périodes
+            { civil: "Jour", undercover: "Nuit" },
+            { civil: "Matin", undercover: "Soir" },
+            { civil: "Été", undercover: "Hiver" },
+            { civil: "Printemps", undercover: "Automne" },
+            { civil: "Noël", undercover: "Halloween" },
+            { civil: "Mariage", undercover: "Lune de Miel" },
+            { civil: "Anniversaire", undercover: "Fête" },
+            { civil: "Vacances", undercover: "Week-end" },
+            { civil: "Croisière", undercover: "Road-Trip" },
+            { civil: "Concert", undercover: "Boite de nuit" },
+            { civil: "Retraite", undercover: "Chômage" },
+            { civil: "Naissance", undercover: "Mort" },
+            { civil: "Grève", undercover: "Arrêt Maladie" },
+            
+            // Actions et Verbes (à l'infinitif)
+            { civil: "Courir", undercover: "Marcher" },
+            { civil: "Nager", undercover: "Surfer" },
+            { civil: "Voler", undercover: "Sauter en Parachute" },
+            { civil: "Pleurer", undercover: "Avoir Peur" },
+            { civil: "Rire", undercover: "Sourire" },
+            { civil: "Dormir", undercover: "Ronfler" },
+            { civil: "Lire", undercover: "Écrire" },
+            { civil: "Manger", undercover: "Boire" },
+            { civil: "Aimer", undercover: "Détester" },
+            { civil: "Acheter", undercover: "Vendre" },
+            
+            // Domaines, Arts et Loisirs
+            { civil: "Football", undercover: "Rugby" },
+            { civil: "Tennis", undercover: "Ping-pong" },
+            { civil: "Basketball", undercover: "Handball" },
+            { civil: "Boxe", undercover: "Catch" },
+            { civil: "Ski", undercover: "Snowboard" },
+            { civil: "Yoga", undercover: "Méditation" },
+            { civil: "Politique", undercover: "Religion" },
+            { civil: "Science", undercover: "Philosophie" },
+            { civil: "Histoire", undercover: "Géographie" },
+            { civil: "Mathématiques", undercover: "Physique" },
+            { civil: "Comédie", undercover: "Tragédie" },
+            { civil: "Dessin animé", undercover: "Film" },
+            { civil: "Série", undercover: "Documentaire" },
+            { civil: "Pop", undercover: "Rap" },
+            { civil: "Silence", undercover: "Bruit" },
+            { civil: "Magie", undercover: "Sorcellerie" },
+            { civil: "Vitesse", undercover: "Lenteur" }
+        ];
+
+        // Mettre à jour l'affichage de la liste des joueurs
+        function actualiserAffichageJoueurs() {
+            const container = document.getElementById('liste-joueurs-container');
+            container.innerHTML = ""; // On vide la liste avant de la recréer
+
+            joueurs.forEach((joueur, index) => {
+                container.innerHTML += `
+                    <div class="etiquette-joueur">
+                        ${joueur} 
+                        <span class="btn-supprimer" onclick="supprimerJoueur(${index})">❌</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById('compteur-joueurs').innerText = `Joueurs : ${joueurs.length}`;
+            
+            // On sauvegarde dans la mémoire du navigateur
+            localStorage.setItem('undercover_joueurs', JSON.stringify(joueurs));
+        }
+
+        // Ajouter un joueur depuis le champ texte
+        function ajouterJoueur() {
+            const input = document.getElementById('nom-joueur');
+            if (input.value.trim() !== "") {
+                joueurs.push(input.value.trim());
+                input.value = "";
+                actualiserAffichageJoueurs();
+            }
+        }
+
+        // Permet d'ajouter un joueur en appuyant sur la touche "Entrée"
+        document.getElementById("nom-joueur").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                ajouterJoueur();
+            }
+        });
+
+        // Supprimer un joueur de la liste
+        function supprimerJoueur(index) {
+            joueurs.splice(index, 1);
+            actualiserAffichageJoueurs();
+        }
+
+        // Lancer la partie
+        function lancerJeu() {
+            const nbJoueurs = joueurs.length;
+            if (nbJoueurs < 3) {
+                alert("Il faut au moins 3 joueurs !");
+                return;
+            }
+
+            const paire = mots[Math.floor(Math.random() * mots.length)];
+            
+            let nbImposteurs = 0;
+            let nbMrWhite = 0;
+
+            if (nbJoueurs === 3 || nbJoueurs === 4) {
+                nbImposteurs = 1;
+            } else if (nbJoueurs === 5 || nbJoueurs === 6) {
+                nbImposteurs = 1;
+                nbMrWhite = 1;
+            } else if (nbJoueurs >= 7 || nbJoueurs <= 9) {
+                nbImposteurs = 2;
+                nbMrWhite = 1;
+            } else if (nbJoueurs >= 10) { 
+                nbImposteurs = 2;
+                nbMrWhite = 2;
+            }
+
+            const nbCivils = nbJoueurs - nbImposteurs - nbMrWhite;
+            repartition = [];
+
+            for (let i = 0; i < nbImposteurs; i++) {
+                repartition.push({ role: "Imposteur", mot: paire.undercover });
+            }
+            for (let i = 0; i < nbMrWhite; i++) {
+                repartition.push({ role: "Mr. White", mot: null });
+            }
+            for (let i = 0; i < nbCivils; i++) {
+                repartition.push({ role: "Civil", mot: paire.civil });
+            }
+
+            repartition.sort(() => Math.random() - 0.5);
+
+            document.getElementById('ecran-setup').classList.add('hidden');
+            afficherTransition();
+        }
+
+        function afficherTransition() {
+            if (indexActuel < joueurs.length) {
+                document.getElementById('nom-actuel').innerText = joueurs[indexActuel];
+                document.getElementById('ecran-mot').classList.add('hidden');
+                document.getElementById('ecran-transition').classList.remove('hidden');
+            } else {
+                document.getElementById('ecran-transition').classList.add('hidden');
+                document.getElementById('ecran-mot').classList.add('hidden');
+                document.getElementById('ecran-fin').classList.remove('hidden');
+            }
+        }
+
+        function voirMot() {
+            document.getElementById('ecran-transition').classList.add('hidden');
+            
+            const donneesJoueur = repartition[indexActuel];
+            const divMessage = document.getElementById('message-role');
+            const divMot = document.getElementById('mot-secret');
+
+            if (donneesJoueur.role === "Mr. White") {
+                divMessage.innerText = "Tu es Mr. White 🕵️‍♂️ !";
+                divMot.innerText = "Tu n'as pas de mot. Fais semblant et devine le mot des autres !";
+                divMot.style.fontSize = "22px";
+                divMot.style.color = "white";
+            } else {
+                divMessage.innerText = "Ton mot secret est :";
+                divMot.innerText = donneesJoueur.mot;
+                divMot.style.fontSize = "35px";
+                divMot.style.color = "#f1c40f";
+            }
+
+            document.getElementById('ecran-mot').classList.remove('hidden');
+        }
+
+        function joueurSuivant() {
+            indexActuel++;
+            afficherTransition();
+        }
+
+        // Réinitialise la partie sans recharger la page et garde les joueurs
+        function nouvellePartie() {
+            indexActuel = 0;
+            repartition = [];
+            document.getElementById('ecran-fin').classList.add('hidden');
+            document.getElementById('ecran-setup').classList.remove('hidden');
+        }
+
+        // Au chargement de la page, on affiche les joueurs enregistrés
+        window.onload = actualiserAffichageJoueurs;
+    </script>
+</body>
+</html>
